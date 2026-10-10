@@ -1,17 +1,31 @@
-# Bases CSV cavistes par département
+# Bases CSV d'envoi — catalogue Journée Dégustation
 
-Génère une base CSV par département à partir de la base de données et du
-fichier d'inscriptions.
+Génère les fichiers d'envoi par département à partir du classeur de prospection,
+des inscriptions et de la liste des désabonnés.
 
-## Fichiers produits
+## Utilisation
 
-`sorties/cavistes_<dep>.csv` pour 85, 56, 49, 35, 44, 53 — 4 colonnes :
+```bash
+python3 build_csv.py                 # cavistes uniquement (périmètre actuel)
+python3 build_csv.py --tous          # toutes les catégories du classeur
+python3 build_csv.py --onglets Cavistes "Bars à vin"
+```
 
-| prénom | mail | département | lien |
-|--------|------|-------------|------|
+Dépendance : `pip install openpyxl`.
 
-plus `sorties/_rejets.csv` qui liste tout ce qui a été écarté, avec le motif
-(à relire avant envoi).
+## Sorties (`sorties/`)
+
+| Fichier | Contenu |
+|---|---|
+| `envoi_85.csv` … `envoi_53.csv` | un fichier par département |
+| `envoi_tous_departements.csv` | **tout le monde dans un seul fichier** — c'est celui à charger pour envoyer d'un coup |
+| `envoi_tous_departements.xlsx` | même contenu, onglet global + un onglet par département |
+| `_rejets.csv` | tout ce qui est écarté, avec le motif |
+
+Quatre colonnes : `prénom`, `mail`, `département`, `lien`. Le lien du catalogue
+est déduit du département, donc rien à modifier entre deux envois.
+
+Encodage UTF-8 avec BOM : Excel ouvre les accents correctement.
 
 ## Liens catalogue par département
 
@@ -24,20 +38,43 @@ plus `sorties/_rejets.csv` qui liste tout ce qui a été écarté, avec le motif
 | 44 | https://drive.google.com/file/d/15IV5mw8lBlADC-PktLD29ICK9JCEiSmm/view?usp=drive_link |
 | 53 | https://drive.google.com/file/d/12eKNUJ32WDHl4ZbJUWjW44NbO9Nr_qxR/view?usp=drive_link |
 
-## Utilisation
-
-```bash
-pip install openpyxl
-python3 build_csv.py base.xlsx inscriptions.xlsx -o sorties/
-```
-
 ## Règles appliquées
 
-- lignes **surlignées en rouge** dans la base de données : exclues
-  (rouge vif comme rouge pâle, sur n'importe quelle cellule de la ligne)
-- inscriptions : ajoutées
-- département : lu dans la colonne dédiée, sinon déduit du code postal
-- doublons de mail : supprimés (première occurrence conservée)
-- nettoyage des mails : syntaxe invalide, domaine inexistant (vérif. MX puis A)
-  et domaines jetables écartés → `_rejets.csv`
-- les contacts hors des six départements sont écartés et listés dans `_rejets.csv`
+**Exclusions**
+- lignes dont le nom est écrit en **police rouge** dans le classeur → écartées.
+  Attention : c'est bien la couleur du texte. Le fond rose pâle est du zébrage
+  (269 lignes sur 270 dans l'onglet Cavistes) et le fond bordeaux est l'en-tête.
+  Une note négative (« Fermé définitivement », « pas intéressé ») **n'est pas**
+  un motif d'exclusion.
+- adresses listées dans `desabonnements.csv`
+- contacts hors des six départements
+- inscrits vignerons (`Invitation = vigneron donc pas besoin`)
+
+**Nettoyage**
+- doublons de mail supprimés (première occurrence conservée)
+- syntaxe invalide, valeurs parasites (`#ERROR!`, formules), domaines jetables
+- existence du domaine vérifiée (MX puis A) par DNS-over-HTTPS, le DNS direct
+  étant filtré dans le conteneur
+
+**Colonne prénom**
+1. formule déjà validée dans `donnees/modele_relance_lot4.csv`, reprise mot pour mot
+2. prénom donné par l'inscrit
+3. prénom saisi à la main dans le classeur — un seul mot ou « X et Y ». La colonne
+   `Gérant(s)` (et la colonne `Prénom` de l'onglet Restaurants) contient des noms
+   d'officiers tirés du registre des entreprises : jamais utilisée.
+4. à défaut, génération « à toute l'équipe de/du/de la/des/de l' <établissement> »
+
+## `desabonnements.csv`
+
+Liste de blocage à enrichir après chaque campagne.
+
+| colonne | rôle |
+|---|---|
+| `mail` | adresse concernée |
+| `motif` | ce qui a été demandé |
+| `date` | date du message |
+| `remplace_par` | nouvelle adresse en cas de changement — le contact est alors **conservé**, avec l'adresse corrigée |
+
+Source : dossier « RETIRER MAILLING » de la boîte `contact@agencescio.com`.
+Cette boîte n'est pas le compte connecté à la session, la liste est donc tenue
+à la main pour l'instant.
